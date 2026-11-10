@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secret Santa 🎄</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#0f172a,#14532d);color:#fff;min-height:100vh;overflow-x:hidden}
+.container{max-width:800px;margin:auto;padding:20px;text-align:center}
+h1{margin-top:15px;font-size:34px}
+.panel{background:rgba(255,255,255,.1);backdrop-filter:blur(8px);border-radius:20px;padding:22px;margin-top:20px}
+button{background:#dc2626;color:white;border:0;padding:13px 25px;border-radius:10px;cursor:pointer;font-size:16px;margin:10px 5px;transition:.2s}
+button:hover{background:#b91c1c;transform:scale(1.03)}
+button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+select{width:100%;padding:14px;border-radius:10px;font-size:16px;margin-top:10px}
+.hidden{display:none!important}
+.card-wrapper{perspective:1200px;width:260px;height:360px;margin:30px auto}
+.card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform 1s}
+.card.flip{transform:rotateY(180deg)}
+.side{position:absolute;width:100%;height:100%;border-radius:20px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;padding:20px}
+.front{background:linear-gradient(135deg,#dc2626,#991b1b);font-size:80px}
+.back{background:white;color:#111827;transform:rotateY(180deg);flex-direction:column}
+.person{font-size:34px;font-weight:bold;color:#15803d;overflow-wrap:anywhere}
+.msg{font-size:18px;margin-top:15px}
+.countdown{font-size:22px;margin-top:15px;font-weight:bold}
+.status{margin-top:15px;font-size:17px;overflow-wrap:anywhere}
+.progress{color:#b6ffb6;margin-top:15px;font-size:18px}
+.rules{color:#d1fae5;font-size:17px;line-height:1.9}
+.shake{animation:shake .15s infinite}
+@keyframes shake{0%{transform:translateX(-5px)}50%{transform:translateX(5px)}100%{transform:translateX(-5px)}}
+.snow{position:fixed;top:-10px;width:6px;height:6px;background:white;border-radius:50%;opacity:.8;pointer-events:none;animation:fall linear infinite;z-index:10}
+@keyframes fall{to{transform:translateY(110vh)}}
+.small{font-size:13px;color:#d1d5db;line-height:1.5}
+#claimBtn{background:#15803d}
+#claimBtn:hover{background:#166534}
+#drawBtn{background:#dc2626}
+#identity{color:#bbf7d0;font-weight:bold}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎄 Secret Santa 🎁</h1>
+  <p>Kalėdinis dovanų traukimas!</p>
+
+  <div class="panel" id="setup">
+    <h3>🎅 Šių metų Secret Santa dalyviai</h3>
+    <div class="rules">
+      Dainius<br>Žana<br>Martynas<br>Rafal<br>Evelina<br>Božena<br>Justina<br>Simona
+    </div>
+    <p>🎁 Žaidime dalyvauja 8 žmonės.</p>
+    <p class="small">Visi gali prisijungti iš skirtingų telefonų ar kompiuterių. Kiekvienas matys tik savo ištrauktą vardą.</p>
+    <button onclick="startGame()">🎄 Pradėti žaidimą</button>
+  </div>
+
+  <div class="panel hidden" id="game">
+    <h3>🎁 Pasirink savo vardą</h3>
+    <p class="rules">Pasirink savo vardą. Ištrauktą kortelę matysi tik tu.</p>
+    <div id="identity" class="hidden"></div>
+    <div id="joinArea">
+      <select id="player">
+        <option value="">-- Pasirink savo vardą --</option>
+      </select>
+      <button id="claimBtn" onclick="claimPlayer()">Patvirtinti savo vardą</button>
+    </div>
+    <button id="drawBtn" class="hidden" onclick="drawCard()">🎁 Traukti kortelę</button>
+
+    <div class="card-wrapper">
+      <div class="card" id="card">
+        <div class="side front">🎁</div>
+        <div class="side back">
+          <div style="font-size:20px">Tu dovanoji:</div>
+          <div class="person" id="targetName"></div>
+          <div class="msg">🎄 Linksmų švenčių!</div>
+        </div>
+      </div>
+    </div>
+    <div class="countdown" id="countdown"></div>
+    <div class="status" id="status"></div>
+    <div class="progress" id="progress"></div>
+    <p class="small">Kortelės turinys siunčiamas tik tavo naršyklei. Kiti dalyviai nemato, kam tu dovanoji.</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ĮRAŠYK SAVO SUPABASE PROJECT URL IR PUBLISHABLE (ANON) KEY.
+const SUPABASE_URL = https://gtewtiifafbauswhsff.supabase.co;
+const SUPABASE_ANON_KEY = sb_publishable_p7ClJaqmNozXYpumpqV9fA_f9Zy4Ooe;
+
+const names = ["Dainius","Žana","Martynas","Rafal","Evelina","Božena","Justina","Simona"];
+let db = null;
+let selectedName = null;
+let busy = false;
+let timer = null;
+let revealTimeout = null;
+
+function showError(message) {
+  document.getElementById("status").textContent = message;
+}
+function startGame() {
+  if (!window.supabase) {
+    alert("Nepavyko įkelti Supabase bibliotekos. Patikrink interneto ryšį.");
+    return;
+  }
+  if (SUPABASE_URL.startsWith("ĮRAŠYK_") || SUPABASE_ANON_KEY.startsWith("ĮRAŠYK_")) {
+    alert("Pirmiausia index.html faile įrašyk Supabase URL ir publishable key. Instrukcija yra README faile.");
+    return;
+  }
+  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  document.getElementById("setup").classList.add("hidden");
+  document.getElementById("game").classList.remove("hidden");
+  const select = document.getElementById("player");
+  select.innerHTML = '<option value="">-- Pasirink savo vardą --</option>';
+  names.forEach(name => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+  });
+  connect();
+}
+async function connect() {
+  try {
+    let { data: { session } } = await db.auth.getSession();
+    if (!session) {
+      const { error } = await db.auth.signInAnonymously();
+      if (error) throw error;
+    }
+    await loadMyIdentity();
+    await refreshStatus();
+    setInterval(refreshStatus, 5000);
+  } catch (e) {
+    showError("Prisijungimo klaida: " + e.message);
+  }
+}
+async function rpc(name, args = {}) {
+  const { data, error } = await db.rpc(name, args);
+  if (error) throw error;
+  return data;
+}
+async function loadMyIdentity() {
+  const rows = await rpc("my_player");
+  if (rows && rows.length) {
+    selectedName = rows[0].name;
+    document.getElementById("joinArea").classList.add("hidden");
+    document.getElementById("identity").classList.remove("hidden");
+    document.getElementById("identity").textContent = "Prisijungei kaip: " + selectedName;
+    document.getElementById("drawBtn").classList.remove("hidden");
+    document.getElementById("drawBtn").textContent = rows[0].has_drawn ? "👀 Vėl peržiūrėti savo kortelę" : "🎁 Traukti kortelę";
+  }
+}
+async function claimPlayer() {
+  const name = document.getElementById("player").value;
+  if (!name) { alert("Pirmiausia pasirink savo vardą!"); return; }
+  const button = document.getElementById("claimBtn");
+  button.disabled = true;
+  try {
+    await rpc("claim_player", { p_name: name });
+    selectedName = name;
+    await loadMyIdentity();
+    await refreshStatus();
+  } catch (e) {
+    showError(e.message.includes("already") || e.message.includes("užimtas")
+      ? "Šis vardas jau pasirinktas kitame įrenginyje. Pasirink savo vardą."
+      : "Nepavyko patvirtinti vardo: " + e.message);
+    button.disabled = false;
+  }
+}
+function resetCard() {
+  document.getElementById("card").classList.remove("flip","shake");
+  document.getElementById("targetName").textContent = "";
+  document.getElementById("countdown").textContent = "";
+  busy = false;
+}
+async function drawCard() {
+  if (busy || !selectedName) return;
+  busy = true;
+  const button = document.getElementById("drawBtn");
+  button.disabled = true;
+  document.getElementById("status").textContent = "";
+  const card = document.getElementById("card");
+  card.classList.remove("flip");
+  card.classList.add("shake");
+  try {
+    // Serveris grąžina tik šio prisijungusio dalyvio ištrauktą vardą.
+    const target = await rpc("draw_card");
+    revealTimeout = setTimeout(() => {
+      card.classList.remove("shake");
+      document.getElementById("targetName").textContent = target;
+      card.classList.add("flip");
+      let sec = 8;
+      document.getElementById("countdown").textContent = "Kortelė užsidarys po " + sec + " s";
+      timer = setInterval(() => {
+        sec--;
+        if (sec > 0) {
+          document.getElementById("countdown").textContent = "Kortelė užsidarys po " + sec + " s";
+        } else {
+          clearInterval(timer); timer = null;
+          card.classList.remove("flip");
+          document.getElementById("targetName").textContent = "";
+          document.getElementById("countdown").textContent = "";
+          document.getElementById("status").textContent = "✓ Tavo kortelė ištraukta. Rezultatą galėsi peržiūrėti dar kartą šiame įrenginyje.";
+          button.textContent = "👀 Vėl peržiūrėti savo kortelę";
+          button.disabled = false;
+          busy = false;
+        }
+      }, 1000);
+      refreshStatus();
+    }, 1800);
+  } catch (e) {
+    card.classList.remove("shake");
+    showError("Nepavyko ištraukti kortelės: " + e.message);
+    button.disabled = false;
+    busy = false;
+  }
+}
+async function refreshStatus() {
+  if (!db) return;
+  try {
+    const rows = await rpc("get_status");
+    const done = rows.filter(r => r.is_drawn).length;
+    document.getElementById("progress").textContent = "Atlikta: " + done + " / " + rows.length;
+    // Rodome tik kas jau ištraukė, bet ne jų gautus vardus.
+    const completed = rows.filter(r => r.is_drawn).map(r => r.name);
+    document.getElementById("status").dataset.progress = completed.join(", ");
+  } catch (e) {
+    console.warn(e);
+  }
+}
+function createSnow() {
+  for (let i = 0; i < 35; i++) {
+    const snow = document.createElement("div");
+    snow.className = "snow";
+    snow.style.left = Math.random() * 100 + "vw";
+    snow.style.animationDuration = (5 + Math.random() * 10) + "s";
+    snow.style.animationDelay = Math.random() * 10 + "s";
+    document.body.appendChild(snow);
+  }
+}
+createSnow();
+</script>
+</body>
+</html>
