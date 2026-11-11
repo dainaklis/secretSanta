@@ -1,478 +1,280 @@
 <!DOCTYPE html>
 <html lang="lt">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0f172a">
-  <title>Secret Santa 🎄</title>
-  <style>
-    * { box-sizing: border-box; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      overflow-x: hidden;
-      font-family: "Segoe UI", Arial, sans-serif;
-      color: #fff;
-      background: linear-gradient(135deg, #0f172a, #14532d);
-    }
+<title>Secret Santa 🎄</title>
 
-    .container {
-      width: min(100% - 32px, 800px);
-      margin: 0 auto;
-      padding: 20px 0 40px;
-      text-align: center;
-    }
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    h1 { margin: 15px 0; font-size: clamp(28px, 6vw, 38px); }
+<style>
 
-    .panel {
-      margin-top: 20px;
-      padding: 22px;
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 20px;
-      background: rgba(255,255,255,.10);
-      backdrop-filter: blur(8px);
-    }
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
 
-    button {
-      margin: 10px 5px;
-      padding: 13px 22px;
-      border: 0;
-      border-radius: 10px;
-      color: #fff;
-      background: #dc2626;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background .2s, transform .2s;
-    }
+body{
+font-family:Segoe UI,Arial,sans-serif;
+background:linear-gradient(135deg,#0f172a,#14532d);
+color:white;
+padding:20px;
+min-height:100vh;
+}
 
-    button:hover:not(:disabled) {
-      background: #b91c1c;
-      transform: translateY(-1px);
-    }
+.container{
+max-width:800px;
+margin:auto;
+}
 
-    button:disabled { opacity: .55; cursor: not-allowed; }
+.panel{
+background:rgba(255,255,255,.1);
+backdrop-filter:blur(10px);
+padding:25px;
+border-radius:20px;
+margin-bottom:20px;
+}
 
-    select {
-      width: 100%;
-      margin-top: 10px;
-      padding: 14px;
-      border: 0;
-      border-radius: 10px;
-      font-size: 16px;
-    }
+h1{
+text-align:center;
+margin-bottom:20px;
+}
 
-    .hidden { display: none !important; }
+h2{
+margin-bottom:15px;
+}
 
-    .rules {
-      color: #d1fae5;
-      font-size: 17px;
-      line-height: 1.9;
-    }
+input,
+select,
+button{
+width:100%;
+padding:14px;
+margin-top:10px;
+border-radius:10px;
+border:none;
+font-size:16px;
+}
 
-    .small {
-      color: #d1d5db;
-      font-size: 13px;
-      line-height: 1.5;
-    }
+button{
+background:#dc2626;
+color:white;
+cursor:pointer;
+transition:.2s;
+}
 
-    #identity {
-      margin-top: 12px;
-      color: #bbf7d0;
-      font-weight: 700;
-    }
+button:hover{
+background:#b91c1c;
+}
 
-    #claimBtn { background: #15803d; }
-    #claimBtn:hover:not(:disabled) { background: #166534; }
+button:disabled{
+opacity:.5;
+cursor:not-allowed;
+}
 
-    .card-wrapper {
-      width: min(260px, 80vw);
-      height: 350px;
-      margin: 30px auto;
-      perspective: 1200px;
-    }
+#card{
+display:none;
+margin-top:20px;
+background:white;
+color:black;
+padding:25px;
+border-radius:15px;
+text-align:center;
+}
 
-    .card {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      transform-style: preserve-3d;
-      transition: transform 1s;
-    }
+.target{
+font-size:32px;
+font-weight:bold;
+color:#15803d;
+margin-top:15px;
+}
 
-    .card.flip { transform: rotateY(180deg); }
+.success{
+margin-top:10px;
+color:#b6ffb6;
+}
 
-    .side {
-      position: absolute;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      padding: 20px;
-      border-radius: 20px;
-      backface-visibility: hidden;
-    }
+.progress{
+margin-top:15px;
+font-size:18px;
+}
 
-    .front {
-      background: linear-gradient(135deg, #dc2626, #991b1b);
-      font-size: 80px;
-    }
+.admin{
+border:2px solid rgba(255,255,255,.15);
+}
 
-    .back {
-      flex-direction: column;
-      color: #111827;
-      background: #fff;
-      transform: rotateY(180deg);
-    }
-
-    .person {
-      overflow-wrap: anywhere;
-      color: #15803d;
-      font-size: 34px;
-      font-weight: 700;
-    }
-
-    .msg { margin-top: 15px; font-size: 18px; }
-    .countdown { min-height: 28px; margin-top: 15px; font-size: 20px; font-weight: 700; }
-    .status { min-height: 26px; margin-top: 12px; overflow-wrap: anywhere; font-size: 16px; }
-    .progress { margin-top: 15px; color: #b6ffb6; font-size: 18px; }
-
-    .shake { animation: shake .15s infinite; }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(-5px); }
-      50% { transform: translateX(5px); }
-    }
-
-    .snow {
-      position: fixed;
-      z-index: 10;
-      top: -10px;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #fff;
-      opacity: .8;
-      pointer-events: none;
-      animation: fall linear infinite;
-    }
-
-    @keyframes fall { to { transform: translateY(110vh); } }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        scroll-behavior: auto !important;
-        animation-duration: .01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: .01ms !important;
-      }
-    }
-  </style>
+</style>
 </head>
+
 <body>
-  <main class="container">
-    <h1>🎄 Secret Santa 🎁</h1>
-    <p>Kalėdinis dovanų traukimas!</p>
 
-    <section class="panel" id="setup">
-      <h3>🎅 Šių metų Secret Santa dalyviai</h3>
-      <div class="rules">
-        Dainius<br>Žana<br>Martynas<br>Rafal<br>
-        Evelina<br>Božena<br>Justina<br>Simona
-      </div>
-      <p>🎁 Žaidime dalyvauja 8 žmonės.</p>
-      <p class="small">
-        Kiekvienas dalyvis jungiasi iš savo telefono ar kompiuterio.
-        Kortelėje rodomas tik jo dovanų gavėjas.
-      </p>
-      <button id="startBtn" type="button">🎄 Pradėti žaidimą</button>
-    </section>
+<div class="container">
 
-    <section class="panel hidden" id="game">
-      <h3>🎁 Pasirink savo vardą</h3>
-      <p class="rules">Pasirink savo vardą ir patvirtink, kad galėtum ištraukti kortelę.</p>
+<h1>🎄 Secret Santa 🎁</h1>
 
-      <div id="identity" class="hidden"></div>
+<div class="panel admin">
 
-      <div id="joinArea">
-        <select id="player" aria-label="Pasirink savo vardą">
-          <option value="">-- Pasirink savo vardą --</option>
-        </select>
-        <button id="claimBtn" type="button">Patvirtinti savo vardą</button>
-      </div>
+<h2>🔐 Administratorius</h2>
 
-      <button id="drawBtn" class="hidden" type="button">🎁 Traukti kortelę</button>
+<input
+type="password"
+id="adminPin"
+placeholder="PIN">
 
-      <div class="card-wrapper" aria-live="polite">
-        <div class="card" id="card">
-          <div class="side front">🎁</div>
-          <div class="side back">
-            <div style="font-size:20px">Tu dovanoji:</div>
-            <div class="person" id="targetName"></div>
-            <div class="msg">🎄 Linksmų švenčių!</div>
-          </div>
-        </div>
-      </div>
+<button onclick="generatePairs()">
+🎲 Sugeneruoti poras
+</button>
 
-      <div class="countdown" id="countdown"></div>
-      <div class="status" id="status" role="status"></div>
-      <div class="progress" id="progress"></div>
-      <p class="small">
-        Kortelės gavėjas grąžinamas tik prisijungusiam dalyviui.
-        Neišsiųsk ir nerodyk savo kortelės kitiems.
-      </p>
-    </section>
-  </main>
+<button onclick="resetGame()">
+♻️ Naujas žaidimas
+</button>
 
-  <!-- Supabase JavaScript biblioteka -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    "use strict";
+<div id="adminStatus"></div>
 
-    // Šiame faile naudok tik Supabase Project URL ir publishable (anon) key.
-    // Niekada nedėk service_role rakto į viešą HTML failą.
-    const SUPABASE_URL = "https://gtewtiifafbauswhsff.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_p7ClJaqmNozXYpumpqV9fA_f9Zy4Ooe";
+</div>
 
-    const names = [
-      "Dainius", "Žana", "Martynas", "Rafal",
-      "Evelina", "Božena", "Justina", "Simona"
-    ];
+<div class="panel">
 
-    let db = null;
-    let selectedName = null;
-    let busy = false;
-    let timer = null;
-    let revealTimeout = null;
-    let statusInterval = null;
+<h2>🎁 Dalyvis</h2>
 
-    const el = (id) => document.getElementById(id);
+<select id="playerSelect">
 
-    function showError(message) {
-      el("status").textContent = message;
-    }
+<option value="">
+Pasirink savo vardą
+</option>
 
-    function clearCardTimers() {
-      if (timer !== null) {
-        clearInterval(timer);
-        timer = null;
-      }
-      if (revealTimeout !== null) {
-        clearTimeout(revealTimeout);
-        revealTimeout = null;
-      }
-    }
+</select>
 
-    async function rpc(functionName, args = {}) {
-      const { data, error } = await db.rpc(functionName, args);
-      if (error) throw error;
-      return data;
-    }
+<button onclick="drawGift()">
+🎁 Traukti kortelę
+</button>
 
-    function populatePlayers() {
-      const select = el("player");
-      select.replaceChildren(new Option("-- Pasirink savo vardą --", ""));
+<div id="card">
 
-      names.forEach((name) => {
-        select.add(new Option(name, name));
-      });
-    }
+<h3>Tu dovanoji:</h3>
 
-    async function startGame() {
-      if (!window.supabase) {
-        alert("Nepavyko įkelti Supabase bibliotekos. Patikrink interneto ryšį.");
-        return;
-      }
+<div id="targetName" class="target"></div>
 
-      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        alert("Trūksta Supabase URL arba publishable key.");
-        return;
-      }
+</div>
 
-      el("startBtn").disabled = true;
+<div id="progress" class="progress"></div>
 
-      try {
-        db = window.supabase.createClient(
-          SUPABASE_URL,
-          SUPABASE_ANON_KEY
-        );
+</div>
 
-        el("setup").classList.add("hidden");
-        el("game").classList.remove("hidden");
-        populatePlayers();
+</div>
 
-        await connect();
-      } catch (error) {
-        showError("Prisijungimo klaida: " + error.message);
-        el("setup").classList.remove("hidden");
-        el("game").classList.add("hidden");
-        el("startBtn").disabled = false;
-      }
-    }
+<script>
 
-    async function connect() {
-      try {
-        const { data, error } = await db.auth.getSession();
-        if (error) throw error;
+const ADMIN_PIN="1234";
 
-        if (!data.session) {
-          const { error: signInError } = await db.auth.signInAnonymously();
-          if (signInError) throw signInError;
-        }
+/* ĮRAŠYK SAVO SUPABASE DUOMENIS */
 
-        await loadMyIdentity();
-        await refreshStatus();
+const SUPABASE_URL =
+"svxoxpuqrqwpqdbiokgc";
 
-        if (statusInterval === null) {
-          statusInterval = setInterval(refreshStatus, 10000);
-        }
-      } catch (error) {
-        showError("Prisijungimo klaida: " + error.message);
-      }
-    }
+const SUPABASE_ANON_KEY =
+"sb_publishable_o07RJCKWedO1LUEJQ61hgQ_EpbTJV5z";
 
-    async function loadMyIdentity() {
-      const rows = await rpc("my_player");
+/* ===================== */
 
-      if (rows && rows.length > 0) {
-        selectedName = rows[0].name;
+const supabaseClient =
+supabase.createClient(
+SUPABASE_URL,
+SUPABASE_ANON_KEY
+);
 
-        el("joinArea").classList.add("hidden");
-        el("identity").classList.remove("hidden");
-        el("identity").textContent = "Prisijungei kaip: " + selectedName;
+function shuffle(array){
 
-        el("drawBtn").classList.remove("hidden");
-        el("drawBtn").textContent = rows[0].has_drawn
-          ? "👀 Vėl peržiūrėti savo kortelę"
-          : "🎁 Traukti kortelę";
-      }
-    }
+const arr=[...array];
 
-    async function claimPlayer() {
-      const name = el("player").value;
+for(let i=arr.length-1;i>0;i--){
 
-      if (!name) {
-        alert("Pirmiausia pasirink savo vardą!");
-        return;
-      }
+const j=
+Math.floor(Math.random()*(i+1));
 
-      const button = el("claimBtn");
-      button.disabled = true;
-      showError("");
+[arr[i],arr[j]]=
+[arr[j],arr[i]];
 
-      try {
-        await rpc("claim_player", { p_name: name });
-        selectedName = name;
-        await loadMyIdentity();
-        await refreshStatus();
-      } catch (error) {
-        showError("Nepavyko patvirtinti vardo: " + error.message);
-        button.disabled = false;
-      }
-    }
+}
 
-    async function drawCard() {
-      if (busy || !selectedName) return;
+return arr;
 
-      busy = true;
-      clearCardTimers();
+}
 
-      const button = el("drawBtn");
-      const card = el("card");
+function createAssignments(players){
 
-      button.disabled = true;
-      showError("");
-      el("countdown").textContent = "";
-      el("targetName").textContent = "";
+let shuffled;
 
-      card.classList.remove("flip");
-      card.classList.add("shake");
+do{
 
-      try {
-        // Serveris grąžina tik šio prisijungusio dalyvio gavėją.
-        // Pakartotinis kvietimas grąžina tą patį gavėją.
-        const target = await rpc("draw_card");
+shuffled = shuffle(players);
 
-        if (typeof target !== "string" || !target) {
-          throw new Error("Serveris negrąžino gavėjo vardo.");
-        }
+}
+while(
+players.some(
+(p,i)=>p.name===shuffled[i].name
+)
+);
 
-        revealTimeout = setTimeout(() => {
-          revealTimeout = null;
-          card.classList.remove("shake");
-          el("targetName").textContent = target;
-          card.classList.add("flip");
+return shuffled;
 
-          let seconds = 8;
-          el("countdown").textContent =
-            "Kortelė užsidarys po " + seconds + " s";
+}
 
-          timer = setInterval(() => {
-            seconds -= 1;
+async function loadPlayers(){
 
-            if (seconds > 0) {
-              el("countdown").textContent =
-                "Kortelė užsidarys po " + seconds + " s";
-              return;
-            }
+const {data,error} =
+await supabaseClient
+.from("participants")
+.select("*")
+.order("name");
 
-            clearInterval(timer);
-            timer = null;
+if(error){
 
-            card.classList.remove("flip");
-            el("targetName").textContent = "";
-            el("countdown").textContent =
-              "Kortelė uždaryta. Gali ją peržiūrėti dar kartą.";
-            button.textContent = "👀 Vėl peržiūrėti savo kortelę";
-            button.disabled = false;
-            busy = false;
-          }, 1000);
+console.error(error);
+return;
 
-          refreshStatus();
-        }, 1200);
-      } catch (error) {
-        card.classList.remove("shake");
-        showError("Nepavyko ištraukti kortelės: " + error.message);
-        button.disabled = false;
-        busy = false;
-      }
-    }
+}
 
-    async function refreshStatus() {
-      if (!db) return;
+const select =
+document.getElementById(
+"playerSelect"
+);
 
-      try {
-        const rows = await rpc("get_status");
+select.innerHTML =
+'<option value="">Pasirink savo vardą</option>';
 
-        if (!rows || rows.length === 0) return;
+data.forEach(player=>{
 
-        const done = Number(rows[0].drawn_count);
-        const total = Number(rows[0].total_count);
+const option =
+document.createElement("option");
 
-        el("progress").textContent = "Atlikta: " + done + " / " + total;
-      } catch (error) {
-        console.warn("Nepavyko atnaujinti progreso:", error);
-      }
-    }
+option.value =
+player.name;
 
-    function createSnow() {
-      for (let i = 0; i < 35; i += 1) {
-        const snow = document.createElement("div");
-        snow.className = "snow";
-        snow.style.left = Math.random() * 100 + "vw";
-        snow.style.animationDuration = (5 + Math.random() * 10) + "s";
-        snow.style.animationDelay = Math.random() * 10 + "s";
-        document.body.appendChild(snow);
-      }
-    }
+option.textContent =
+player.drawn
+? player.name + " ✅"
+: player.name;
 
-    el("startBtn").addEventListener("click", startGame);
-    el("claimBtn").addEventListener("click", claimPlayer);
-    el("drawBtn").addEventListener("click", drawCard);
+option.disabled =
+player.drawn;
 
-    createSnow();
-  </script>
-</body>
-</html>
+select.appendChild(option);
+
+});
+
+updateProgress();
+
+}
+
+async function updateProgress(){
+
+const {data} =
+await supabaseClient
+.from("participants")
+.select("drawn");
+
+const done =
+data.filter(
+x=>x
